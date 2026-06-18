@@ -11,10 +11,10 @@ import java.util.regex.Pattern;
 
 public final class UrlExtractor {
     private static final Pattern EXPLICIT_URL = Pattern.compile(
-            "(?i)\\b(?:https?://|www\\.)[^\\s\\u3000<>\\\"'“”‘’]+"
+            "(?i)\\b(?:https?://|www\\.)[^\\s\\u3000<>\\\"'“”‘’，。；：！？）】》」』、]+"
     );
     private static final Pattern BARE_DOMAIN = Pattern.compile(
-            "(?i)(?<![@\\w])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,}(?:/[^\\s\\u3000<>\\\"'“”‘’]*)?"
+            "(?i)(?<![@\\w])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,}(?:/[^\\s\\u3000<>\\\"'“”‘’，。；：！？）】》」』、]*)?"
     );
     private static final String TRAILING = ".,;:!?)]}。，；：！？）】》」』、";
 

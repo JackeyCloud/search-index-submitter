@@ -50,6 +50,13 @@ jobs:
             release/SearchIndexSubmitter-Android.apk
           test -s release/SearchIndexSubmitter-Android.apk
           file release/SearchIndexSubmitter-Android.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify \
+            --verbose --print-certs release/SearchIndexSubmitter-Android.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging \
+            release/SearchIndexSubmitter-Android.apk \
+            | grep "package: name='com.jackeycloud.searchindexsubmitter'"
+          unzip -p release/SearchIndexSubmitter-Android.apk classes2.dex \
+            | strings | grep 'MainActivity'
           sha256sum release/SearchIndexSubmitter-Android.apk \
             > release/SearchIndexSubmitter-Android.apk.sha256
 

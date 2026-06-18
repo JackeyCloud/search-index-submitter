@@ -1,0 +1,64 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build-android:
+    name: Android APK
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform
+        shell: bash
+        run: yes | sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      - name: Run Android unit tests
+        run: gradle -p android --no-daemon :app:testDebugUnitTest
+
+      - name: Build installable debug APK
+        run: gradle -p android --no-daemon :app:assembleDebug
+
+      - name: Prepare artifact
+        shell: bash
+        run: |
+          mkdir -p release
+          cp android/app/build/outputs/apk/debug/app-debug.apk \
+            release/SearchIndexSubmitter-Android.apk
+          test -s release/SearchIndexSubmitter-Android.apk
+          file release/SearchIndexSubmitter-Android.apk
+          sha256sum release/SearchIndexSubmitter-Android.apk \
+            > release/SearchIndexSubmitter-Android.apk.sha256
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SearchIndexSubmitter-Android
+          path: |
+            release/SearchIndexSubmitter-Android.apk
+            release/SearchIndexSubmitter-Android.apk.sha256
+          if-no-files-found: error
+          retention-days: 30

@@ -38,6 +38,8 @@ python3 -m venv .venv
 
 详见：[桌面版安装与首次打开](docs/桌面版安装与首次打开.md)。
 
+Android 用户可以在 `Build Android APK` 工作流中下载 `SearchIndexSubmitter-Android.apk`。移动版支持从小红书等分享文案中自动提取 URL，也支持系统“分享到本应用”。详见：[Android 版使用与账号连接说明](docs/Android版使用与账号连接说明.md)。
+
 CLI 示例：
 
 ```bash

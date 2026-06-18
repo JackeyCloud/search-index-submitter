@@ -1,0 +1,4 @@
+interface:
+  display_name: "新站搜索引擎提交"
+  short_description: "查重并向百度、Google、IndexNow 等提交新站 URL 与 Sitemap"
+  default_prompt: "Use $submit-new-site-indexing to check and submit my new site to supported search engines."

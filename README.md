@@ -30,6 +30,14 @@ python3 -m venv .venv
 .venv/bin/python run.py
 ```
 
+不想安装 Python 的用户可以在 GitHub Actions 的 `Build desktop apps` 工作流中下载：
+
+- macOS Intel 版；
+- macOS Apple Silicon 版；
+- Windows x64 版。
+
+详见：[桌面版安装与首次打开](docs/桌面版安装与首次打开.md)。
+
 CLI 示例：
 
 ```bash

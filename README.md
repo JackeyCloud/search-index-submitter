@@ -76,3 +76,8 @@ CLI 示例：
 ```bash
 cp -R codex-skill/submit-new-site-indexing ~/.codex/skills/
 ```
+
+## 详细文档
+
+- [用户配置与凭据获取指南](docs/搜索引擎一键提交工具_用户配置与使用指南.md)
+- [商业价值分析](docs/搜索引擎一键提交工具_商业价值分析.md)

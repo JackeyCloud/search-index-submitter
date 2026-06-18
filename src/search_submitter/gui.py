@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sys
-import webbrowser
 from dataclasses import fields
 
 from PySide6.QtCore import QObject, QThread, Qt, Signal
@@ -149,9 +148,9 @@ class ConfigDialog(QDialog):
             form.addRow(labels[field.name], widget)
             self.inputs[field.name] = widget
         layout.addLayout(form)
-        docs = QLabel('<a style="color:#68a7ff" href="https://github.com/">凭据申请说明见项目文档</a>')
-        docs.setOpenExternalLinks(False)
-        docs.linkActivated.connect(lambda _: webbrowser.open("https://developers.google.com/webmaster-tools/v1/how-tos/authorizing"))
+        guide_url = "https://github.com/JackeyCloud/search-index-submitter/blob/main/docs/%E6%90%9C%E7%B4%A2%E5%BC%95%E6%93%8E%E4%B8%80%E9%94%AE%E6%8F%90%E4%BA%A4%E5%B7%A5%E5%85%B7_%E7%94%A8%E6%88%B7%E9%85%8D%E7%BD%AE%E4%B8%8E%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97.md"
+        docs = QLabel(f'<a style="color:#68a7ff" href="{guide_url}">打开完整凭据申请与配置指南</a>')
+        docs.setOpenExternalLinks(True)
         layout.addWidget(docs)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)

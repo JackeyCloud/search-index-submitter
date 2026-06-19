@@ -11,6 +11,7 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.InputType;
@@ -18,6 +19,8 @@ import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
@@ -51,12 +54,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
-    private static final int BG = Color.rgb(7, 16, 31);
-    private static final int CARD = Color.rgb(17, 28, 47);
-    private static final int FIELD = Color.rgb(9, 20, 38);
-    private static final int BORDER = Color.rgb(42, 60, 90);
-    private static final int TEXT = Color.rgb(235, 243, 255);
-    private static final int MUTED = Color.rgb(137, 160, 194);
+    private static final int BG = Color.rgb(246, 249, 254);
+    private static final int CARD = Color.WHITE;
+    private static final int FIELD = Color.rgb(248, 250, 252);
+    private static final int BORDER = Color.rgb(220, 230, 242);
+    private static final int TEXT = Color.rgb(23, 32, 51);
+    private static final int MUTED = Color.rgb(100, 116, 139);
     private static final int BLUE = Color.rgb(36, 117, 232);
     private static final String PREFS = "search_submitter";
     private static final String GUIDE_URL = "https://github.com/JackeyCloud/search-index-submitter/blob/main/docs/%E6%90%9C%E7%B4%A2%E5%BC%95%E6%93%8E%E4%B8%80%E9%94%AE%E6%8F%90%E4%BA%A4%E5%B7%A5%E5%85%B7_%E7%94%A8%E6%88%B7%E9%85%8D%E7%BD%AE%E4%B8%8E%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97.md";
@@ -80,6 +83,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        configureSystemBars();
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         historyStore = new HistoryStore(this);
         setContentView(buildUi());
@@ -107,14 +111,15 @@ public class MainActivity extends Activity {
         scroll.setBackgroundColor(BG);
 
         LinearLayout root = vertical();
-        root.setPadding(dp(20), dp(20), dp(20), dp(28));
+        root.setPadding(dp(20), dp(16), dp(20), dp(28));
         root.setBackgroundColor(BG);
+        applySafeAreaInsets(root);
         scroll.addView(root, matchWrap());
 
         LinearLayout header = horizontal();
         LinearLayout titleArea = vertical();
-        TextView title = text("新站一键提交", 26, TEXT, true);
-        TextView subtitle = text("粘贴分享文案，自动提取链接并批量提交", 13, MUTED, false);
+        TextView title = text("内容收录助手", 26, TEXT, true);
+        TextView subtitle = text("让自有网站内容更快被搜索引擎发现", 13, MUTED, false);
         titleArea.addView(title);
         titleArea.addView(subtitle);
         header.addView(titleArea, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
@@ -129,11 +134,25 @@ public class MainActivity extends Activity {
         header.addView(settings, settingsParams);
         root.addView(header, marginBottom(16));
 
+        LinearLayout hero = vertical();
+        hero.setPadding(dp(16), dp(14), dp(16), dp(14));
+        hero.setBackground(rounded(Color.rgb(234, 244, 255), Color.rgb(191, 220, 255), 14));
+        hero.addView(text("一次粘贴，多平台发现", 18, Color.rgb(20, 89, 168), true));
+        TextView heroCopy = text("自动提取链接、提交前查重、保存提交记录，帮助你的官网、博客、产品页和内容站点更快进入搜索引擎发现流程。", 13, Color.rgb(51, 74, 105), false);
+        heroCopy.setLineSpacing(0, 1.12f);
+        hero.addView(heroCopy, marginTop(6));
+        hero.addView(text("1 粘贴链接  ·  2 连接站长平台  ·  3 查重提交", 13, Color.rgb(23, 103, 212), true), marginTop(9));
+        TextView ownership = text("第三方笔记可提取链接，但不能用你的凭据代替小红书、携程等平台提交。", 12, Color.rgb(138, 90, 18), false);
+        ownership.setPadding(dp(10), dp(8), dp(10), dp(8));
+        ownership.setBackground(rounded(Color.rgb(255, 247, 230), Color.rgb(242, 211, 155), 8));
+        hero.addView(ownership, marginTop(10));
+        root.addView(hero, marginBottom(14));
+
         LinearLayout inputCard = card();
         inputCard.addView(text("批量输入网址或分享文案", 16, TEXT, true));
         input = new EditText(this);
         input.setTextColor(TEXT);
-        input.setHintTextColor(Color.rgb(102, 122, 151));
+        input.setHintTextColor(Color.rgb(126, 143, 166));
         input.setTextSize(15);
         input.setGravity(Gravity.TOP | Gravity.START);
         input.setHint("每行一个网址，或直接粘贴小红书等平台的整段分享文案…");
@@ -173,12 +192,12 @@ public class MainActivity extends Activity {
         platformCard.addView(baiduCheck);
         platformCard.addView(bingCheck);
         platformCard.addView(yandexCheck);
-        TextView platformNote = text("只能提交您拥有或已在站长平台验证的网站。小红书、携程等第三方分享文案可以提取链接，但平台 API 可能拒绝非本人站点。", 12, MUTED, false);
+        TextView platformNote = text("站长提交只适用于你拥有、已验证，或能部署验证文件的网站。公开页面会被搜索引擎自然发现，但第三方平台链接不能由本软件强制提交。", 12, MUTED, false);
         platformNote.setPadding(0, dp(8), 0, 0);
         platformCard.addView(platformNote);
-        configHint = text("", 13, Color.rgb(147, 197, 253), true);
+        configHint = text("", 13, Color.rgb(23, 103, 212), true);
         configHint.setPadding(dp(12), dp(10), dp(12), dp(10));
-        configHint.setBackground(rounded(Color.rgb(15, 40, 70), Color.rgb(59, 130, 246), 9));
+        configHint.setBackground(rounded(Color.rgb(234, 244, 255), Color.rgb(156, 200, 247), 9));
         configHint.setOnClickListener(v -> showSettings());
         platformCard.addView(configHint, marginTop(10));
         updateConfigHint();
@@ -336,10 +355,10 @@ public class MainActivity extends Activity {
         List<String> missing = missingSelectedConfigs();
         if (missing.isEmpty()) {
             configHint.setText("✓ 已选平台配置完成，可以直接提交");
-            configHint.setTextColor(Color.rgb(110, 231, 183));
+            configHint.setTextColor(Color.rgb(22, 120, 92));
         } else {
             configHint.setText("还差 " + missing.size() + " 项配置 · 点这里按步骤完成");
-            configHint.setTextColor(Color.rgb(147, 197, 253));
+            configHint.setTextColor(Color.rgb(23, 103, 212));
         }
     }
 
@@ -431,11 +450,11 @@ public class MainActivity extends Activity {
 
     private void addBadge(LinearLayout row, String label, String platform, HistoryStore.Entry entry, int brandColor) {
         int state = entry.indexStatuses.containsKey(platform) ? entry.indexStatuses.get(platform) : HistoryStore.UNKNOWN;
-        TextView badge = text(label, label.length() > 1 ? 10 : 13, state == HistoryStore.INDEXED ? Color.WHITE : Color.rgb(148, 163, 184), true);
+        TextView badge = text(label, label.length() > 1 ? 10 : 13, state == HistoryStore.INDEXED ? Color.WHITE : Color.rgb(100, 116, 139), true);
         badge.setGravity(Gravity.CENTER);
         badge.setContentDescription(platform + (state == HistoryStore.INDEXED ? " 已收录" : " 未确认收录"));
-        badge.setBackground(rounded(state == HistoryStore.INDEXED ? brandColor : Color.rgb(30, 41, 59),
-                state == HistoryStore.NOT_INDEXED ? Color.rgb(242, 200, 107) : Color.rgb(71, 85, 105), 16));
+        badge.setBackground(rounded(state == HistoryStore.INDEXED ? brandColor : Color.rgb(241, 245, 249),
+                state == HistoryStore.NOT_INDEXED ? Color.rgb(225, 163, 62) : Color.rgb(203, 213, 225), 16));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(36), dp(32));
         if (row.getChildCount() > 0) params.setMarginStart(dp(8));
         row.addView(badge, params);
@@ -788,7 +807,7 @@ public class MainActivity extends Activity {
     private LinearLayout card() {
         LinearLayout layout = vertical();
         layout.setPadding(dp(16), dp(14), dp(16), dp(16));
-        layout.setBackground(rounded(CARD, Color.rgb(32, 48, 75), 14));
+        layout.setBackground(rounded(CARD, BORDER, 14));
         return layout;
     }
 
@@ -805,9 +824,43 @@ public class MainActivity extends Activity {
         Button button = new Button(this);
         button.setText(label);
         button.setAllCaps(false);
-        button.setTextColor(Color.WHITE);
-        button.setBackground(rounded(primary ? BLUE : Color.rgb(27, 43, 67), primary ? Color.rgb(63, 140, 255) : Color.rgb(48, 71, 101), 9));
+        button.setTextColor(primary ? Color.WHITE : Color.rgb(51, 65, 85));
+        button.setBackground(rounded(primary ? BLUE : Color.rgb(238, 244, 251), primary ? BLUE : Color.rgb(203, 216, 232), 9));
         return button;
+    }
+
+    private void configureSystemBars() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            getWindow().setDecorFitsSystemWindows(false);
+            getWindow().setStatusBarColor(Color.TRANSPARENT);
+            getWindow().setNavigationBarColor(Color.TRANSPARENT);
+            WindowInsetsController controller = getWindow().getInsetsController();
+            if (controller != null) {
+                controller.setSystemBarsAppearance(
+                        WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                                | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
+                        WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                                | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
+            }
+        } else {
+            getWindow().setStatusBarColor(BG);
+            getWindow().setNavigationBarColor(BG);
+            getWindow().getDecorView().setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        }
+    }
+
+    private void applySafeAreaInsets(View root) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return;
+        final int left = root.getPaddingLeft();
+        final int top = root.getPaddingTop();
+        final int right = root.getPaddingRight();
+        final int bottom = root.getPaddingBottom();
+        root.setOnApplyWindowInsetsListener((view, windowInsets) -> {
+            android.graphics.Insets bars = windowInsets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+            view.setPadding(left + bars.left, top + bars.top, right + bars.right, bottom + bars.bottom);
+            return windowInsets;
+        });
     }
 
     private CheckBox check(String label, boolean checked) {

@@ -40,24 +40,29 @@ from .targets import parse_targets
 
 
 APP_STYLE = """
-QWidget { background: #0b1220; color: #dbe7ff; font-size: 14px; }
-QMainWindow { background: #07101f; }
-QFrame#Card { background: #111c2f; border: 1px solid #20304b; border-radius: 14px; }
-QLabel#Title { font-size: 28px; font-weight: 700; color: #f6f9ff; }
-QLabel#Subtitle { color: #89a0c2; font-size: 13px; }
-QLabel#Section { font-size: 16px; font-weight: 650; color: #eef4ff; }
-QTextEdit, QLineEdit, QSpinBox { background: #091426; border: 1px solid #2a3c5a; border-radius: 8px; padding: 9px; selection-background-color: #2475e8; }
+QWidget { background: #f6f9fe; color: #172033; font-size: 14px; }
+QMainWindow { background: #f6f9fe; }
+QFrame#Card { background: #ffffff; border: 1px solid #dce6f2; border-radius: 14px; }
+QFrame#Hero { background: #eaf4ff; border: 1px solid #bfdcff; border-radius: 14px; }
+QLabel#Title { font-size: 28px; font-weight: 700; color: #172033; }
+QLabel#HeroTitle { font-size: 18px; font-weight: 700; color: #1459a8; }
+QLabel#Subtitle { color: #64748b; font-size: 13px; }
+QLabel#Section { font-size: 16px; font-weight: 650; color: #25324a; }
+QTextEdit, QLineEdit, QSpinBox { background: #f8fafc; color: #172033; border: 1px solid #cbd8e8; border-radius: 8px; padding: 9px; selection-background-color: #2475e8; }
 QTextEdit:focus, QLineEdit:focus { border: 1px solid #4b96ff; }
-QPushButton { background: #1b2b43; border: 1px solid #304765; border-radius: 8px; padding: 9px 16px; font-weight: 600; }
-QPushButton:hover { background: #243a5a; }
-QPushButton#Primary { background: #2475e8; border-color: #3f8cff; color: white; }
-QPushButton#Primary:hover { background: #3182f3; }
-QPushButton#Preview { background: #173f3b; border-color: #24685f; color: #95f2df; }
-QPushButton:disabled { color: #65748a; background: #142033; }
-QCheckBox { spacing: 7px; color: #c8d8f0; }
-QTableWidget { background: #0b1628; alternate-background-color: #101d31; border: 1px solid #20304b; border-radius: 9px; gridline-color: #1d2b42; }
-QHeaderView::section { background: #16243a; color: #9eb4d3; padding: 8px; border: 0; border-right: 1px solid #263750; font-weight: 600; }
-QToolTip { background: #192942; color: white; border: 1px solid #3b5375; }
+QPushButton { background: #eef4fb; color: #334155; border: 1px solid #cbd8e8; border-radius: 8px; padding: 9px 16px; font-weight: 600; }
+QPushButton:hover { background: #e2edf9; }
+QPushButton#Primary { background: #2475e8; border-color: #2475e8; color: white; }
+QPushButton#Primary:hover { background: #1767d4; }
+QPushButton#Preview { background: #ecfdf5; border-color: #9edfc6; color: #16785c; }
+QPushButton:disabled { color: #94a3b8; background: #edf2f7; }
+QCheckBox { spacing: 7px; color: #334155; }
+QTabWidget::pane { border: 1px solid #dce6f2; background: #ffffff; border-radius: 8px; }
+QTabBar::tab { background: #eaf0f8; color: #52637a; padding: 9px 18px; border: 1px solid #dce6f2; }
+QTabBar::tab:selected { background: #ffffff; color: #1767d4; font-weight: 650; }
+QTableWidget { background: #ffffff; alternate-background-color: #f7faff; border: 1px solid #dce6f2; border-radius: 9px; gridline-color: #e8eef6; }
+QHeaderView::section { background: #edf3fb; color: #52637a; padding: 8px; border: 0; border-right: 1px solid #dce6f2; font-weight: 600; }
+QToolTip { background: #ffffff; color: #172033; border: 1px solid #b8c7da; }
 """
 
 
@@ -180,7 +185,7 @@ class ConfigDialog(QDialog):
             self.inputs[field.name] = widget
         layout.addLayout(form)
         guide_url = "https://github.com/JackeyCloud/search-index-submitter/blob/main/docs/%E6%90%9C%E7%B4%A2%E5%BC%95%E6%93%8E%E4%B8%80%E9%94%AE%E6%8F%90%E4%BA%A4%E5%B7%A5%E5%85%B7_%E7%94%A8%E6%88%B7%E9%85%8D%E7%BD%AE%E4%B8%8E%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97.md"
-        docs = QLabel(f'<a style="color:#68a7ff" href="{guide_url}">打开完整凭据申请与配置指南</a>')
+        docs = QLabel(f'<a style="color:#1767d4" href="{guide_url}">打开完整凭据申请与配置指南</a>')
         docs.setOpenExternalLinks(True)
         layout.addWidget(docs)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
@@ -208,7 +213,7 @@ class MainWindow(QMainWindow):
         self.thread: QThread | None = None
         self.worker: QObject | None = None
         self.refresh_done = 0
-        self.setWindowTitle("新站搜索引擎一键提交")
+        self.setWindowTitle("内容收录助手")
         self.resize(1180, 820)
         root = QWidget()
         self.setCentralWidget(root)
@@ -218,9 +223,9 @@ class MainWindow(QMainWindow):
 
         top = QHBoxLayout()
         heading = QVBoxLayout()
-        title = QLabel("新站一键提交")
+        title = QLabel("内容收录助手")
         title.setObjectName("Title")
-        subtitle = QLabel("统一通知搜索引擎发现你的 URL 和 Sitemap，不承诺平台一定收录")
+        subtitle = QLabel("让你发布在自有网站上的内容，更快被搜索引擎发现")
         subtitle.setObjectName("Subtitle")
         heading.addWidget(title)
         heading.addWidget(subtitle)
@@ -234,6 +239,26 @@ class MainWindow(QMainWindow):
         config_button.clicked.connect(self.open_config)
         top.addWidget(config_button)
         outer.addLayout(top)
+
+        hero = QFrame()
+        hero.setObjectName("Hero")
+        hero_layout = QVBoxLayout(hero)
+        hero_layout.setContentsMargins(18, 14, 18, 14)
+        hero_title = QLabel("把重复的站长平台提交，变成一次粘贴、一次检查、一次提交")
+        hero_title.setObjectName("HeroTitle")
+        hero_layout.addWidget(hero_title)
+        hero_copy = QLabel("适合已验证的官网、博客、产品页和内容站点。自动提取链接，提交前查重，并持续记录 Google、百度、Bing、Yandex 等平台状态。")
+        hero_copy.setObjectName("Subtitle")
+        hero_copy.setWordWrap(True)
+        hero_layout.addWidget(hero_copy)
+        steps = QLabel("① 粘贴网址或分享文案    ② 连接站长平台    ③ 查重并提交")
+        steps.setStyleSheet("color:#1767d4;font-weight:650;padding-top:4px;")
+        hero_layout.addWidget(steps)
+        ownership = QLabel("提示：小红书、携程等第三方页面可提取链接和保存记录，但不能用你的站长凭据代替平台所有者提交。")
+        ownership.setWordWrap(True)
+        ownership.setStyleSheet("color:#8a5a12;background:#fff7e6;border:1px solid #f2d39b;border-radius:7px;padding:7px;")
+        hero_layout.addWidget(ownership)
+        outer.addWidget(hero)
 
         input_card = QFrame()
         input_card.setObjectName("Card")
@@ -277,7 +302,7 @@ class MainWindow(QMainWindow):
         platform_layout.addWidget(self.deduplicate_check)
         self.config_hint = QLabel()
         self.config_hint.setWordWrap(True)
-        self.config_hint.setStyleSheet("background:#0f2846;color:#93c5fd;border:1px solid #3b82f6;border-radius:8px;padding:9px;")
+        self.config_hint.setStyleSheet("background:#eaf4ff;color:#1767d4;border:1px solid #9cc8f7;border-radius:8px;padding:9px;")
         self.config_hint.setToolTip("点击打开账号与平台配置")
         self.config_hint.mousePressEvent = lambda _event: self.open_config()
         platform_layout.addWidget(self.config_hint)
@@ -354,10 +379,10 @@ class MainWindow(QMainWindow):
         missing = self.missing_credentials()
         if missing:
             self.config_hint.setText(f"还差 {len(missing)} 项配置 · 点击这里按教程完成。软件不会要求平台密码。")
-            self.config_hint.setStyleSheet("background:#0f2846;color:#93c5fd;border:1px solid #3b82f6;border-radius:8px;padding:9px;")
+            self.config_hint.setStyleSheet("background:#eaf4ff;color:#1767d4;border:1px solid #9cc8f7;border-radius:8px;padding:9px;")
         else:
             self.config_hint.setText("✓ 已选平台配置完成，可以直接预检并提交")
-            self.config_hint.setStyleSheet("background:#123b32;color:#6ee7b7;border:1px solid #2b8a72;border-radius:8px;padding:9px;")
+            self.config_hint.setStyleSheet("background:#ecfdf5;color:#16785c;border:1px solid #9edfc6;border-radius:8px;padding:9px;")
 
     def selected_providers(self) -> list[str]:
         return [key for key, checkbox in self.checkboxes.items() if checkbox.isChecked()]
@@ -517,7 +542,7 @@ class MainWindow(QMainWindow):
 
 def main() -> int:
     app = QApplication(sys.argv)
-    app.setApplicationName("新站搜索引擎一键提交")
+    app.setApplicationName("内容收录助手")
     app.setStyle("Fusion")
     app.setStyleSheet(APP_STYLE)
     window = MainWindow()

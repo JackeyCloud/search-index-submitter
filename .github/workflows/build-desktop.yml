@@ -58,6 +58,7 @@ jobs:
             --clean \
             --windowed \
             --name SearchIndexSubmitter \
+            --icon assets/app-icon.icns \
             --paths src \
             --collect-all googleapiclient \
             --collect-all google_auth_oauthlib \
@@ -88,6 +89,7 @@ jobs:
             --onefile `
             --windowed `
             --name SearchIndexSubmitter `
+            --icon assets/app-icon.ico `
             --paths src `
             --collect-all googleapiclient `
             --collect-all google_auth_oauthlib `

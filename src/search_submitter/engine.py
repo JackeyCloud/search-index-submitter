@@ -62,7 +62,7 @@ def run_submissions(
             else:
                 result = provider.submit(submit_target, sitemap_url, dry_run=dry_run)
             details = dict(result.details)
-            details.update({"sitemap": sitemap_url, "sitemap_source": source, "index_checks": checks})
+            details.update({"provider_id": provider_id, "sitemap": sitemap_url, "sitemap_source": source, "index_checks": checks})
             result = SubmissionResult(result.provider, result.target, result.status, result.message, details)
             results.append(result)
             if callback:

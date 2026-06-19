@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import sys
 from dataclasses import fields
+from datetime import datetime
+from pathlib import Path
 
 from PySide6.QtCore import QObject, QThread, Qt, Signal
 from PySide6.QtGui import QColor, QFont
@@ -23,6 +25,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -30,7 +33,9 @@ from PySide6.QtWidgets import (
 
 from .config import AppConfig
 from .engine import run_submissions
-from .models import SubmissionResult
+from .history import HistoryStore
+from .index_check import refresh_index_statuses
+from .models import IndexCheck, IndexState, SubmissionResult
 from .targets import parse_targets
 
 
@@ -69,6 +74,7 @@ PROVIDERS = [
 
 class SubmissionWorker(QObject):
     result = Signal(object)
+    completed = Signal(object)
     error = Signal(str)
     finished = Signal()
 
@@ -84,13 +90,38 @@ class SubmissionWorker(QObject):
     def run(self) -> None:
         try:
             targets = parse_targets(self.text, self.sitemap)
-            run_submissions(
+            results = run_submissions(
                 targets,
                 self.providers,
                 self.config,
                 dry_run=self.dry_run,
                 check_existing=self.check_existing,
                 callback=self.result.emit,
+            )
+            self.completed.emit(results)
+        except Exception as exc:
+            self.error.emit(str(exc))
+        finally:
+            self.finished.emit()
+
+
+class RefreshWorker(QObject):
+    progress = Signal(str, str, object)
+    error = Signal(str)
+    finished = Signal()
+
+    def __init__(self, urls: list[str], config: AppConfig):
+        super().__init__()
+        self.urls = urls
+        self.config = config
+
+    def run(self) -> None:
+        try:
+            refresh_index_statuses(
+                self.urls,
+                ("google", "bing"),
+                self.config,
+                callback=self.progress.emit,
             )
         except Exception as exc:
             self.error.emit(str(exc))
@@ -105,7 +136,7 @@ class ConfigDialog(QDialog):
         self.setMinimumWidth(620)
         self.config = config
         layout = QVBoxLayout(self)
-        hint = QLabel("凭据仅保存在 ~/.search-index-submitter/config.json，并设置为仅当前用户可读。")
+        hint = QLabel("不需要填写平台账号密码。按下方教程登录官方平台获取 Key/token；Google 首次使用会打开官方 OAuth 授权页。凭据仅保存在本机。")
         hint.setObjectName("Subtitle")
         hint.setWordWrap(True)
         layout.addWidget(hint)
@@ -173,8 +204,10 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.config = AppConfig.load()
+        self.history_store = HistoryStore()
         self.thread: QThread | None = None
-        self.worker: SubmissionWorker | None = None
+        self.worker: QObject | None = None
+        self.refresh_done = 0
         self.setWindowTitle("新站搜索引擎一键提交")
         self.resize(1180, 820)
         root = QWidget()
@@ -193,7 +226,11 @@ class MainWindow(QMainWindow):
         heading.addWidget(subtitle)
         top.addLayout(heading)
         top.addStretch()
-        config_button = QPushButton("平台凭据")
+        self.refresh_button = QPushButton("⟳ 刷新收录")
+        self.refresh_button.setToolTip("重新查询历史网址在 Google 和 Bing 的收录状态")
+        self.refresh_button.clicked.connect(self.start_history_refresh)
+        top.addWidget(self.refresh_button)
+        config_button = QPushButton("账号与平台")
         config_button.clicked.connect(self.open_config)
         top.addWidget(config_button)
         outer.addLayout(top)
@@ -238,6 +275,15 @@ class MainWindow(QMainWindow):
         self.deduplicate_check.setChecked(True)
         self.deduplicate_check.setToolTip("Google/Bing 使用站长 API 精确查询；无法确认的平台仍会提交")
         platform_layout.addWidget(self.deduplicate_check)
+        self.config_hint = QLabel()
+        self.config_hint.setWordWrap(True)
+        self.config_hint.setStyleSheet("background:#0f2846;color:#93c5fd;border:1px solid #3b82f6;border-radius:8px;padding:9px;")
+        self.config_hint.setToolTip("点击打开账号与平台配置")
+        self.config_hint.mousePressEvent = lambda _event: self.open_config()
+        platform_layout.addWidget(self.config_hint)
+        for checkbox in self.checkboxes.values():
+            checkbox.toggled.connect(self.update_config_hint)
+        self.update_config_hint()
         outer.addWidget(platform_card)
 
         action_row = QHBoxLayout()
@@ -255,20 +301,63 @@ class MainWindow(QMainWindow):
         action_row.addWidget(self.submit_button)
         outer.addLayout(action_row)
 
-        self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["状态", "平台", "站点", "结果"])
-        self.table.setAlternatingRowColors(True)
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.verticalHeader().setVisible(False)
-        header = self.table.horizontalHeader()
+        self.tabs = QTabWidget()
+        self.history_table = QTableWidget(0, 9)
+        self.history_table.setHorizontalHeaderLabels(["提交时间", "网址", "G", "百度", "Bing", "Yandex", "360", "神马", "最近检查"])
+        self.history_table.setAlternatingRowColors(True)
+        self.history_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.history_table.verticalHeader().setVisible(False)
+        history_header = self.history_table.horizontalHeader()
+        history_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        history_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        for column in range(2, 8):
+            history_header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
+        history_header.setSectionResizeMode(8, QHeaderView.ResizeMode.ResizeToContents)
+        self.tabs.addTab(self.history_table, "提交记录")
+
+        self.result_table = QTableWidget(0, 4)
+        self.result_table.setHorizontalHeaderLabels(["状态", "平台", "站点", "结果"])
+        self.result_table.setAlternatingRowColors(True)
+        self.result_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.result_table.verticalHeader().setVisible(False)
+        header = self.result_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        outer.addWidget(self.table, 1)
+        self.tabs.addTab(self.result_table, "本次结果")
+        outer.addWidget(self.tabs, 1)
+        self.load_history()
 
     def open_config(self) -> None:
-        ConfigDialog(self.config, self).exec()
+        if ConfigDialog(self.config, self).exec() == QDialog.DialogCode.Accepted:
+            self.update_config_hint()
+
+    def missing_credentials(self, providers: list[str] | None = None) -> list[str]:
+        providers = providers or self.selected_providers()
+        missing = []
+        if "indexnow" in providers and not self.config.indexnow_key.strip():
+            missing.append("IndexNow Key 与网站根目录 Key 文件")
+        if "baidu" in providers and not (self.config.baidu_token.strip() or self.config.baidu_token_map.strip()):
+            missing.append("百度搜索资源平台 token")
+        if "google" in providers:
+            path = Path(self.config.google_client_secrets).expanduser() if self.config.google_client_secrets else None
+            if not path or not path.exists():
+                missing.append("Google OAuth 客户端 JSON")
+        if "bing" in providers and not self.config.bing_api_key.strip():
+            missing.append("Bing Webmaster API Key")
+        if "yandex" in providers and not self.config.yandex_oauth_token.strip():
+            missing.append("Yandex OAuth Token")
+        return missing
+
+    def update_config_hint(self) -> None:
+        missing = self.missing_credentials()
+        if missing:
+            self.config_hint.setText(f"还差 {len(missing)} 项配置 · 点击这里按教程完成。软件不会要求平台密码。")
+            self.config_hint.setStyleSheet("background:#0f2846;color:#93c5fd;border:1px solid #3b82f6;border-radius:8px;padding:9px;")
+        else:
+            self.config_hint.setText("✓ 已选平台配置完成，可以直接预检并提交")
+            self.config_hint.setStyleSheet("background:#123b32;color:#6ee7b7;border:1px solid #2b8a72;border-radius:8px;padding:9px;")
 
     def selected_providers(self) -> list[str]:
         return [key for key, checkbox in self.checkboxes.items() if checkbox.isChecked()]
@@ -282,6 +371,14 @@ class MainWindow(QMainWindow):
         if not providers:
             QMessageBox.warning(self, "缺少平台", "请至少选择一个提交平台。")
             return
+        missing = self.missing_credentials(providers)
+        if not dry_run and missing:
+            message = "以下平台配置尚未完成：\n\n• " + "\n• ".join(missing)
+            message += "\n\n只能提交您拥有或已验证的网站。是否先打开账号与平台配置？"
+            answer = QMessageBox.question(self, "提交前还差一步", message)
+            if answer == QMessageBox.StandardButton.Yes:
+                self.open_config()
+                return
         try:
             target_count = len(parse_targets(text, self.sitemap_input.text().strip()))
         except ValueError as exc:
@@ -291,13 +388,17 @@ class MainWindow(QMainWindow):
             answer = QMessageBox.question(self, "确认提交", f"将向 {len(providers)} 个平台处理 {target_count} 个站点。继续吗？")
             if answer != QMessageBox.StandardButton.Yes:
                 return
-        self.table.setRowCount(0)
+        targets = parse_targets(text, self.sitemap_input.text().strip())
+        self.current_submission_urls = [url for target in targets for url in target.urls]
+        self.result_table.setRowCount(0)
+        self.tabs.setCurrentWidget(self.result_table)
         self.set_busy(True, "正在预检…" if dry_run else "正在提交…")
         self.thread = QThread(self)
         self.worker = SubmissionWorker(text, self.sitemap_input.text().strip(), providers, self.config, dry_run, self.deduplicate_check.isChecked())
         self.worker.moveToThread(self.thread)
         self.thread.started.connect(self.worker.run)
         self.worker.result.connect(self.add_result)
+        self.worker.completed.connect(lambda results: self.handle_submission_completed(results, dry_run))
         self.worker.error.connect(self.show_error)
         self.worker.finished.connect(self.finish_submission)
         self.worker.finished.connect(self.thread.quit)
@@ -305,8 +406,8 @@ class MainWindow(QMainWindow):
         self.thread.start()
 
     def add_result(self, result: SubmissionResult) -> None:
-        row = self.table.rowCount()
-        self.table.insertRow(row)
+        row = self.result_table.rowCount()
+        self.result_table.insertRow(row)
         labels = {"success": "成功", "failed": "失败", "skipped": "跳过", "manual": "人工", "dry_run": "预检"}
         colors = {"success": "#55d6a7", "failed": "#ff718b", "skipped": "#f2c86b", "manual": "#c196ff", "dry_run": "#67a9ff"}
         values = [labels[result.status.value], result.provider, result.target, result.message]
@@ -315,19 +416,102 @@ class MainWindow(QMainWindow):
             if column == 0:
                 item.setForeground(QColor(colors[result.status.value]))
                 item.setFont(QFont(item.font().family(), -1, QFont.Weight.DemiBold))
-            self.table.setItem(row, column, item)
+            self.result_table.setItem(row, column, item)
+
+    def handle_submission_completed(self, results: list[SubmissionResult], dry_run: bool) -> None:
+        if not dry_run:
+            self.history_store.record_submission(self.current_submission_urls, results)
+            self.load_history()
 
     def show_error(self, message: str) -> None:
         QMessageBox.critical(self, "执行失败", message)
 
     def finish_submission(self) -> None:
-        self.set_busy(False, f"完成，共 {self.table.rowCount()} 条结果")
+        self.set_busy(False, f"完成，共 {self.result_table.rowCount()} 条结果")
         self.worker = None
         self.thread = None
+
+    def start_history_refresh(self) -> None:
+        if self.thread and self.thread.isRunning():
+            QMessageBox.information(self, "任务进行中", "请等待当前任务完成后再刷新。")
+            return
+        records = self.history_store.list_records()
+        if not records:
+            QMessageBox.information(self, "暂无记录", "提交网址后会在这里保存永久记录。")
+            return
+        self.refresh_done = 0
+        self.set_busy(True, f"正在刷新 {len(records)} 个网址…")
+        self.thread = QThread(self)
+        self.worker = RefreshWorker([record.url for record in records], self.config)
+        self.worker.moveToThread(self.thread)
+        self.thread.started.connect(self.worker.run)
+        self.worker.progress.connect(self.handle_refresh_result)
+        self.worker.error.connect(self.show_error)
+        self.worker.finished.connect(self.finish_history_refresh)
+        self.worker.finished.connect(self.thread.quit)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.thread.start()
+
+    def handle_refresh_result(self, url: str, provider_id: str, check: IndexCheck) -> None:
+        self.history_store.update_index_status(url, provider_id, check.state)
+        self.refresh_done += 1
+        self.status_label.setText(f"已检查 {self.refresh_done} 项：{provider_id} · {check.message}")
+
+    def finish_history_refresh(self) -> None:
+        self.load_history()
+        self.tabs.setCurrentWidget(self.history_table)
+        self.set_busy(False, f"刷新完成，共检查 {self.refresh_done} 项")
+        self.worker = None
+        self.thread = None
+
+    def load_history(self) -> None:
+        records = self.history_store.list_records()
+        self.history_table.setRowCount(len(records))
+        platform_columns = {"google": 2, "baidu": 3, "bing": 4, "yandex": 5, "360": 6, "shenma": 7}
+        brand_colors = {
+            "google": "#4285f4", "baidu": "#4e6ef2", "bing": "#00a4ef",
+            "yandex": "#ff4b4b", "360": "#35c759", "shenma": "#ff7a1a",
+        }
+        for row, record in enumerate(records):
+            date_item = QTableWidgetItem(self.format_date(record.last_submitted_at))
+            date_item.setToolTip(f"首次：{record.first_submitted_at}\n提交次数：{record.submission_count}")
+            self.history_table.setItem(row, 0, date_item)
+            url_item = QTableWidgetItem(record.url)
+            url_item.setToolTip(record.url)
+            self.history_table.setItem(row, 1, url_item)
+            for provider_id, column in platform_columns.items():
+                state = record.index_statuses.get(provider_id, IndexState.UNKNOWN.value)
+                icon = "●" if state == IndexState.INDEXED.value else "○"
+                item = QTableWidgetItem(icon)
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                if state == IndexState.INDEXED.value:
+                    item.setForeground(QColor(brand_colors[provider_id]))
+                    item.setToolTip("已确认收录")
+                elif state == IndexState.NOT_INDEXED.value:
+                    item.setForeground(QColor("#f2c86b"))
+                    item.setToolTip("查询时暂未确认收录")
+                else:
+                    item.setForeground(QColor("#64748b"))
+                    submitted = provider_id in record.submitted_providers
+                    item.setToolTip("已提交，尚无法确认收录" if submitted else "尚无收录数据")
+                self.history_table.setItem(row, column, item)
+            checked_item = QTableWidgetItem(self.format_date(record.last_checked_at) if record.last_checked_at else "未刷新")
+            self.history_table.setItem(row, 8, checked_item)
+        self.tabs.setTabText(0, f"提交记录 ({len(records)})")
+
+    @staticmethod
+    def format_date(value: str | None) -> str:
+        if not value:
+            return ""
+        try:
+            return datetime.fromisoformat(value).strftime("%m-%d %H:%M")
+        except ValueError:
+            return value
 
     def set_busy(self, busy: bool, message: str) -> None:
         self.preview_button.setDisabled(busy)
         self.submit_button.setDisabled(busy)
+        self.refresh_button.setDisabled(busy)
         self.status_label.setText(message)
 
 

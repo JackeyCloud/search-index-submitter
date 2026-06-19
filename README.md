@@ -40,6 +40,8 @@ python3 -m venv .venv
 
 Android 用户可以在 `Build Android APK` 工作流中下载 `SearchIndexSubmitter-Android.apk`。移动版支持从小红书等分享文案中自动提取 URL，也支持系统“分享到本应用”。详见：[Android 版使用与账号连接说明](docs/Android版使用与账号连接说明.md)。
 
+桌面端和 Android 端都会永久保存提交记录，包括网址、最近提交时间、提交次数、已选平台、各搜索引擎收录状态及最近刷新时间。右上角“刷新收录”会重新调用已配置的官方查询接口；只有明确确认收录的平台徽标才会点亮。
+
 CLI 示例：
 
 ```bash

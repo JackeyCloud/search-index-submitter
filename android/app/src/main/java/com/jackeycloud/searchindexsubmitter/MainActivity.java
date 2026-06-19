@@ -298,11 +298,11 @@ public class MainActivity extends Activity {
         final Set<String> selectedPlatforms = selectedPlatforms();
         executor.execute(() -> {
             StringBuilder report = new StringBuilder();
+            historyStore.recordSubmission(urls, selectedPlatforms);
             if (doIndexNow) submitIndexNow(urls, report);
             if (doBaidu) submitBaidu(urls, report);
             if (doBing) submitBing(urls, report);
             if (doYandex) submitYandex(urls, report);
-            historyStore.recordSubmission(urls, selectedPlatforms);
             runOnUiThread(() -> {
                 results.setText(report.length() == 0 ? "没有产生处理结果" : report.toString().trim());
                 submitButton.setEnabled(true);
@@ -515,8 +515,18 @@ public class MainActivity extends Activity {
                     String checkUrl = "https://ssl.bing.com/webmaster/api.svc/json/GetUrlInfo?siteUrl="
                             + encode(entry.getKey() + "/") + "&url=" + encode(url) + "&apikey=" + encode(key);
                     Response check = request("GET", checkUrl, null, null, null);
-                    JSONObject record = check.code == 200 ? new JSONObject(check.body).optJSONObject("d") : null;
-                    if (record != null && record.length() > 0) indexed++; else remaining.add(url);
+                    if (check.code == 200) {
+                        JSONObject record = new JSONObject(check.body).optJSONObject("d");
+                        if (record != null && record.length() > 0) {
+                            indexed++;
+                            historyStore.updateIndexStatus(url, "bing", HistoryStore.INDEXED);
+                        } else {
+                            remaining.add(url);
+                            historyStore.updateIndexStatus(url, "bing", HistoryStore.NOT_INDEXED);
+                        }
+                    } else {
+                        remaining.add(url);
+                    }
                 } catch (Exception ignored) {
                     remaining.add(url);
                 }
